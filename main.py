@@ -31,6 +31,10 @@ parser.add_argument('--gan_weight', dest='gan_weight', type=float, default=, hel
 parser.add_argument('--use_lsgan', dest='use_lsgan', type=bool, default=True, help='gan loss defined in lsgan')
 parser.add_argument('--max_size', dest='max_size', type=int, default=50, help='max size of image pool, 0 means do not use image pool')
 
+parser.add_argument('--nef', dest = 'nef', type = int, default = 32, help = 'number of encoder filters in 1st conv layer')
+parser.add_argument('--ndf', dest = 'ndf', type = int, default = 64, help = 'number of decoder filters in 4th deconv layer')
+parser.add_argument('--ndcf', dest = 'ndcf', type = int, default = 16, help = 'number of discriminator filters in 1th conv layer')
+
 args = parser.parse_args()
 
 

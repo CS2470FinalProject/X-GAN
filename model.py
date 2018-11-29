@@ -29,8 +29,8 @@ class xgan:
         else:
             self.criterionGAN = sce_criterion
         
-        OPTIONS = namedtuple('OPTIONS', 'output_c_dim is_training')
-        self.options = OPTIONS._make((args.output_nc, args.phase == 'train'))
+        OPTIONS = namedtuple('OPTIONS', 'output_c_dim is_training ef_dim df_dim dcf_dim')
+        self.options = OPTIONS._make((args.output_nc, args.phase == 'train', args.nef, args.ndf, args.ndcf))
         
         self._build_model()
         self.saver = tf.train.Saver()
