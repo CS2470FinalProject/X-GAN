@@ -4,55 +4,56 @@ import tensorflow as tf
 from ops import *
 from utils import *
 
+from flip_gradient import flip_gradient
 
-def discriminator(image, options, domain_name):
+
+def discriminator(image, options, name):
     
-    with tf.variable_scope(domain_name, reuse=tf.AUTO_REUSE):
+    with tf.variable_scope(name, reuse=tf.AUTO_REUSE):
         # image is (batch_size x 64 x 64 x input_c_dim)
-        h1 = lrelu(conv2d(image, options.dcf_dim, name = 'h1_conv'))
+        h1 = lrelu(conv2d(image, options.dcf_dim, name='h1_conv'))
         # h1 is (batch_size x 32 x 32 x args.ndcf)
-        h2 = lrelu(instance_norm(conv2d(h1, options.dcf_dim * 2, name = 'h2_conv'), 'h_bn2'))
+        h2 = lrelu(instance_norm(conv2d(h1, options.dcf_dim * 2, name='h2_conv'), 'h_bn2'))
         # h2 is (batch_size x 16 x 16 x args.ndcf * 2)
         h3 = lrelu(instance_norm(conv2d(h2, options.dcf_dim * 2, name='h3_conv'), 'h_bn3'))
         # h3 is (batch_size x 8 x 8 x args.ndcf * 2)
         h4 = lrelu(instance_norm(conv2d(h3, options.dcf_dim * 2, name='h4_conv'), 'h_bn4'))
         # h4 is (batch_size x 4 x 4 x args.ndcf * 2)
-        h5 = h4.reshape(h4, [tf.shape(h4)[0], 1, 1, -1])
-        h5 = linear(h5, 1)
+        h5 = conv2d(h4, 1, ks=4, s=1, padding='VALID', name='d_h3_pred')
         # h5 is (batch_size x 1 x 1 x 1)
 
     return h5
+
 
 def encoder(image, options, domain_name):
     
     with tf.variable_scope("encoder_" + domain_name, reuse=tf.AUTO_REUSE):
         # image is (batch_size x 64 x 64 x input_c_dim)
-        e1 = instance_norm(conv2d(image, options.ef_dim, name = 'e1_conv'), 'e_bn1')
+        e1 = instance_norm(conv2d(image, options.ef_dim, name='e1_conv'), 'e_bn1')
         # e1 is (batch_size x 32 x 32 x args.nef)
-        e2 = instance_norm(conv2d(lrelu(e1), options.ef_dim * 2, name = 'e2_conv'), 'e_bn2')
+        e2 = instance_norm(conv2d(lrelu(e1), options.ef_dim * 2, name='e2_conv'), 'e_bn2')
         # e2 is (batch_size x 16 x 16 x args.nef * 2)
 
     with tf.variable_scope("encoder_sharing", reuse=tf.AUTO_REUSE):
-        e3 = instance_norm(conv2d(lrelu(e2), options.ef_dim * 4, name = 'e3_conv'), 'e_bn3')
+        e3 = instance_norm(conv2d(lrelu(e2), options.ef_dim * 4, name='e3_conv'), 'e_bn3')
         # e3 is (batch_size x 8 x 8 x args.nef * 4)
-        e4 = instance_norm(conv2d(lrelu(e3), options.ef_dim * 8, name = 'e4_conv'), 'e_bn4')
+        e4 = instance_norm(conv2d(lrelu(e3), options.ef_dim * 8, name='e4_conv'), 'e_bn4')
         # e4 is (batch_size x 4 x 4 x args.nef * 8)
-        e4 = tf.reshape(e4, [tf.shape(e4)[0], 1, 1, -1])
-        # e4 is (batch_size x 1 x 1 x 4 * 4 * args.nef * 8)
-        e5 = instance_norm(linear(e4, 1024), 'fc1')
+        e5 = instance_norm(conv2d(lrelu(e4), 1024, ks=4, s=1, padding='VALID', name='e5_conv'), 'e_bn5')
         # e5 is (batch_size x 1 x 1 x 1024)
-        e6 = instance_norm(linear(e5, 1024), 'fc2')
+        e6 = instance_norm(conv2d(lrelu(e5), 1024, ks=1, s=1, padding='VALID', name='e6_conv'), 'e_bn6')
         # e6 is (batch_size x 1 x 1 x 1024)
 
     return e6
 
-def decoder(image, options, domain_name):
+
+def decoder(input, options, domain_name):
     
     with tf.variable_scope("decoder_sharing", reuse=tf.AUTO_REUSE):
-        d1 = tf.reshape(image, [tf.shape(image)[0], 2, 2, 256])
-        d1 = instance_norm(deconv2d(tf.nn.relu(d1), options.df_dim * 8, name = 'd1_dconv'), 'd_bn1')
+        #d1 = tf.reshape(input, [tf.shape(input)[0], 2, 2, 256])
+        d1 = instance_norm(deconv2d(tf.nn.relu(input), options.df_dim * 8, s=4, name='d1_dconv'), 'd_bn1')
         # d1 is (bathc_size x 4 x 4 x args.ndf * 8)
-        d2 = instance_norm(deconv2d(tf.nn.relu(d1), options.df_dim * 4, name = 'd2_dconv'), 'd_bn2')
+        d2 = instance_norm(deconv2d(tf.nn.relu(d1), options.df_dim * 4, name='d2_dconv'), 'd_bn2')
         # d2 is (batch_size x 8 x 8 x args.ndf * 4)
 
     
@@ -65,6 +66,23 @@ def decoder(image, options, domain_name):
         # d5 is (batch_size x 64 x 64 x args.output_nc)
 
     return tf.nn.tanh(d5)
+    
+
+def cdann(input):
+    
+    with tf.variable_scope("cdann", reuse=tf.AUTO_REUSE):
+        fg = flip_gradient(input)
+        c1 = lrelu(instance_norm(conv2d(fg, 1024, ks=1, s=1, padding='VALID', name='c1_conv'), 'c_bn1'))
+        # c1 is (batch_size x 1 x 1 x 1024)
+        c2 = lrelu(instance_norm(conv2d(c1, 1024, ks=1, s=1, padding='VALID', name='c2_conv'), 'c_bn2'))
+        # c2 is (batch_size x 1 x 1 x 1024)
+        c3 = lrelu(instance_norm(conv2d(c2, 1024, ks=1, s=1, padding='VALID', name='c3_conv'), 'c_bn3'))
+        # c3 is (batch_size x 1 x 1 x 1024)
+        c4 = conv2d(c3, 1, ks=1, s=1, padding='VALID', name='c4_conv')
+        # c4 is (batch_size x 1 x 1 x 1)
+
+    return c4
+
         
 def euc_criterion(in_, target):
     return tf.losses.mean_squared_error(target, in_)

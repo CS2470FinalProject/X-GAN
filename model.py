@@ -24,6 +24,7 @@ class xgan:
         self.discriminator = discriminator
         self.encoder = encoder
         self.decoder = decoder
+        self.cdann = cdann
         if args.use_lsgan:
             self.criterionGAN = mae_criterion
         else:
@@ -56,6 +57,10 @@ class xgan:
         # B->encoderB->decoderB
         self.reconstruct_A = self.decoder(self.embedding_A, self.options, domain_name="A")
         self.reconstruct_B = self.decoder(self.embedding_B, self.options, domain_name="B")
+          
+        # Cdann output
+        self.cdann_A = self.cdann(self.embedding_A)
+        self.cdann_B = self.cdann(self.embedding_B)
         
         # Generator output
         # B->encoderB->decoderA
@@ -78,7 +83,7 @@ class xgan:
         self.rec_loss = self.rec_loss_A + self.rec_loss_B
         
         # Domain-adversarial loss
-        self.dann_loss = 
+        self.dann_loss = sce_criterion(self.cdann_A, tf.zeros_like(self.cdann_A)) + sce_criterion(self.cdann_B, tf.ones_like(self.cdann_B))
         
         # Semantic consistency loss
         self.sem_loss_A = abs_criterion(self.embedding_A, self.embedding_fake_B)
@@ -145,7 +150,7 @@ class xgan:
         self.test_fake_B = self.decoder(self.test_embedding_A, self.options, domain_name="B")
 
         t_vars = tf.trainable_variables()
-        self.gen_vars = [var for var in t_vars if 'encoder' in var.name or 'decoder' in var.name]
+        self.gen_vars = [var for var in t_vars if 'encoder' in var.name or 'decoder' in var.name or 'cdann' in var.name]
         self.dis_vars = [var for var in t_vars if 'discriminator' in var.name]
         for var in t_vars: print(var.name)
             
@@ -190,7 +195,7 @@ class xgan:
                 [fake_A, fake_B] = self.pool([fake_A, fake_B])
 
                 # Update discriminator network
-                dis_loss， _, summary_str = self.sess.run(
+                dis_loss, _, summary_str = self.sess.run(
                     [self.dis_loss, self.dis_optim, self.dis_sum],
                     feed_dict={self.real_data: batch_images,
                                self.fake_A_sample: fake_A,
@@ -199,9 +204,7 @@ class xgan:
                 self.writer.add_summary(summary_str, counter)
 
                 counter += 1
-                print(("Epoch: [%2d] [%4d/%4d] rec_loss: %4.1f|dann_loss: %4.1f \
-                       sem_loss: %4.1f|gen_gan_loss: %4.1f \
-                       gen_loss: %4.1f|dis_loss: %4.1f" % (
+                print(("Epoch: [%2d] [%4d/%4d] rec_loss: %4.3f|dann_loss: %4.3f|sem_loss: %4.3f|gen_gan_loss: %4.3f|gen_loss: %4.3f|dis_loss: %4.3f" % (
                     epoch, idx, batch_idxs, rec_loss, dann_loss, sem_loss, gen_gan_loss, gen_loss, dis_loss)))
                 
                 if np.mod(counter, args.print_freq) == 1:
@@ -245,7 +248,7 @@ class xgan:
         np.random.shuffle(dataA)
         np.random.shuffle(dataB)
         batch_files = list(zip(dataA[:self.batch_size], dataB[:self.batch_size]))
-        sample_images = [load_train_data(batch_file, is_testing=True) for batch_file in batch_files]
+        sample_images = [load_train_data(batch_file, fine_size=64, is_testing=True) for batch_file in batch_files]
         sample_images = np.array(sample_images).astype(np.float32)
 
         fake_A, fake_B = self.sess.run(
