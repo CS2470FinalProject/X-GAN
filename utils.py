@@ -42,13 +42,13 @@ class ImagePool(object):
         else:
             return image
 
-def load_test_data(image_path, fine_size=256):
+def load_test_data(image_path, fine_size=64):
     img = imread(image_path)
     img = scipy.misc.imresize(img, [fine_size, fine_size])
     img = img/127.5 - 1
     return img
 
-def load_train_data(image_path, load_size=286, fine_size=256, is_testing=False):
+def load_train_data(image_path, load_size=64, fine_size=64, is_testing=False):
     img_A = imread(image_path[0])
     img_B = imread(image_path[1])
     if not is_testing:

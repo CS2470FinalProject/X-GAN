@@ -185,6 +185,8 @@ class xgan:
                                        dataB[idx * self.batch_size:(idx + 1) * self.batch_size]))
                 batch_images = [load_train_data(batch_file, args.load_size, args.fine_size) for batch_file in batch_files]
                 batch_images = np.array(batch_images).astype(np.float32)
+                
+                ra = self.sess.run(self.real_A, feed_dict={self.real_data: batch_images}) 
 
                 # Update generator network and record fake outputs
                 fake_A, fake_B, rec_loss, dann_loss, sem_loss, gen_gan_loss, gen_loss, _, summary_str = self.sess.run(

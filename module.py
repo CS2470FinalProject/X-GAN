@@ -39,9 +39,9 @@ def encoder(image, options, domain_name):
         # e3 is (batch_size x 8 x 8 x args.nef * 4)
         e4 = instance_norm(conv2d(lrelu(e3), options.ef_dim * 8, name='e4_conv'), 'e_bn4')
         # e4 is (batch_size x 4 x 4 x args.nef * 8)
-        e5 = instance_norm(conv2d(lrelu(e4), 1024, ks=4, s=1, padding='VALID', name='e5_conv'), 'e_bn5')
+        e5 = conv2d(lrelu(e4), 1024, ks=4, s=1, padding='VALID', name='e5_conv')
         # e5 is (batch_size x 1 x 1 x 1024)
-        e6 = instance_norm(conv2d(lrelu(e5), 1024, ks=1, s=1, padding='VALID', name='e6_conv'), 'e_bn6')
+        e6 = conv2d(lrelu(e5), 1024, ks=1, s=1, padding='VALID', name='e6_conv')
         # e6 is (batch_size x 1 x 1 x 1024)
 
     return e6
@@ -62,7 +62,7 @@ def decoder(input, options, domain_name):
         # d3 is (batch_size x 16 x 16 x args.ndf * 2)
         d4 = instance_norm(deconv2d(tf.nn.relu(d3), options.df_dim, name='d4_dconv'), 'd_bn4')
         # d4 is (batch_size x 32 x 32 x args.ndf)
-        d5 = instance_norm(deconv2d(tf.nn.relu(d4), options.output_c_dim, name='d5_dconv'), 'd_bn5')
+        d5 = deconv2d(tf.nn.relu(d4), options.output_c_dim, name='d5_dconv')
         # d5 is (batch_size x 64 x 64 x args.output_nc)
 
     return tf.nn.tanh(d5)
@@ -72,11 +72,11 @@ def cdann(input):
     
     with tf.variable_scope("cdann", reuse=tf.AUTO_REUSE):
         fg = flip_gradient(input)
-        c1 = lrelu(instance_norm(conv2d(fg, 1024, ks=1, s=1, padding='VALID', name='c1_conv'), 'c_bn1'))
+        c1 = lrelu(conv2d(fg, 1024, ks=1, s=1, padding='VALID', name='c1_conv'))
         # c1 is (batch_size x 1 x 1 x 1024)
-        c2 = lrelu(instance_norm(conv2d(c1, 1024, ks=1, s=1, padding='VALID', name='c2_conv'), 'c_bn2'))
+        c2 = lrelu(conv2d(c1, 1024, ks=1, s=1, padding='VALID', name='c2_conv'))
         # c2 is (batch_size x 1 x 1 x 1024)
-        c3 = lrelu(instance_norm(conv2d(c2, 1024, ks=1, s=1, padding='VALID', name='c3_conv'), 'c_bn3'))
+        c3 = lrelu(conv2d(c2, 1024, ks=1, s=1, padding='VALID', name='c3_conv'))
         # c3 is (batch_size x 1 x 1 x 1024)
         c4 = conv2d(c3, 1, ks=1, s=1, padding='VALID', name='c4_conv')
         # c4 is (batch_size x 1 x 1 x 1)
